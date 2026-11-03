@@ -1,0 +1,98 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // 1. Instruction Decoding & Load Signals
+    // If instruction[15] is 0, it's an A-instruction. If 1, it's a C-instruction.
+    Not(in=instruction[15], out=notC);
+    
+    // A Register loads if it's an A-instruction (notC) OR if a C-instruction says so (instruction[5])
+    Or(a=notC, b=instruction[5], out=loadA);
+    
+    // D Register loads only if a C-instruction says so (instruction[4])
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    
+    // Write to Memory only if a C-instruction says so (instruction[3])
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // 2. A Register Input
+    // If it's a C-instruction, load the ALU output. 
+    // If it's an A-instruction, load the instruction (but zero out the top bit).
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aInput);
+    ARegister(in=aInput, load=loadA, out=aOut, out[0..14]=addressM);
+
+    // 3. ALU Input Selector (The 'a' bit in the instruction)
+    // If instruction[12] is 0, use the A register. If 1, use inM (Memory).
+    Mux16(a=aOut, b=inM, sel=instruction[12], out=aluY);
+
+    // 4. D Register
+    DRegister(in=aluOut, load=loadD, out=dOut);
+
+    // 5. The ALU
+    // Executes math based on the 6 control bits (instruction[11..6]).
+    // Note the zr and ng outputs, which we need for the jump logic.
+    ALU(x=dOut, y=aluY, 
+        zx=instruction[11], nx=instruction[10], 
+        zy=instruction[9],  ny=instruction[8], 
+        f=instruction[7],   no=instruction[6], 
+        out=aluOut, out=outM, zr=zrOut, ng=ngOut);
+
+    // 6. Jump Logic
+    // Determine if we should jump based on ALU flags (zr, ng) and jump bits (instruction[2..0])
+    Not(in=ngOut, out=notNg);
+    Not(in=zrOut, out=notZr);
+    
+    // JGT (Jump if Greater Than 0) -> instruction[0]
+    And(a=notNg, b=notZr, out=isPositive);
+    And(a=isPositive, b=instruction[0], out=jumpGT);
+    
+    // JEQ (Jump if Equal to 0) -> instruction[1]
+    And(a=zrOut, b=instruction[1], out=jumpEQ);
+    
+    // JLT (Jump if Less Than 0) -> instruction[2]
+    And(a=ngOut, b=instruction[2], out=jumpLT);
+    
+    // Combine jump conditions
+    Or(a=jumpGT, b=jumpEQ, out=jumpGTEQ);
+    Or(a=jumpGTEQ, b=jumpLT, out=shouldJump);
+    
+    // The PC only loads if it's a C-instruction AND a jump condition is met
+    And(a=shouldJump, b=instruction[15], out=loadPC);
+
+    // If we are jumping (loadPC = 1), we do NOT increment the PC. Otherwise, we do.
+    Not(in=loadPC, out=incPC);
+
+    // 7. The PC (Program Counter)
+    PC(in=aOut, load=loadPC, inc=incPC, reset=reset, out[0..14]=pc);
+}
+
