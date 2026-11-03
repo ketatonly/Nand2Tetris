@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // This file is part of www.nand2tetris.org
 // and the book "The Elements of Computing Systems"
 // by Nisan and Schocken, MIT Press.
@@ -15,4 +16,23 @@ CHIP Or16 {
     Not16(in = a, out = na);
     Not16(in = b, out = nb);
     Nand16(a = na, b = nb, out = out);
+=======
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/1/Or16.hdl
+/**
+ * 16-bit Or gate:
+ * for i = 0, ..., 15:
+ * out[i] = a[i] Or b[i] 
+ */
+CHIP Or16 {
+    IN a[16], b[16];
+    OUT out[16];
+
+    PARTS:
+    Not16(in = a, out = na);
+    Not16(in = b, out = nb);
+    Nand16(a = na, b = nb, out = out);
+>>>>>>> 1409a0aa7b55f0cecd900b116671920d3cd641a6
 }
