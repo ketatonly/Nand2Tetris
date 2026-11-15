@@ -37,7 +37,7 @@ let clean_line (line : string) : string option =
 let parse (s : string) : command =
   let n = String.length s in
   if n = 0 then failwith "parse: empty"
-  else if s.[0] = '@' then
+  else if s.[0] 2= '@' then
     A (String.sub s 1 (n - 1))
   else if s.[0] = '(' && s.[n-1] = ')' then
     Label (String.sub s 1 (n - 2))
